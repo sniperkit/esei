@@ -1,6 +1,7 @@
 package es
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
+// EsInfo 封装的ElasticSearch操作数据
 type EsInfo struct {
 	EsURL   string
 	EsUser  string
@@ -18,8 +20,10 @@ type EsInfo struct {
 	EsType  string
 	EsSize  int
 	IsDebug bool
-	client  *elastic.Client
-	ctx     context.Context
+	// Mode 运行模式 0 导出/ 1 导入
+	Mode   int
+	client *elastic.Client
+	ctx    context.Context
 }
 
 // Do Elasticsearch入口函数
@@ -31,22 +35,50 @@ func (e *EsInfo) Do(file string) error {
 	}
 
 	e.ctx = context.Background()
-	data, hit, err := e.search()
-	if err != nil {
-		return err
+
+	switch e.Mode {
+	case 0:
+		data, hit, err := e.export()
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Total Hit [%d] Once Receive [%d]\n", hit, len(data))
+
+		fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			fs.Close()
+		}()
+		for _, d := range data {
+			fs.WriteString(d + "\n")
+
+		}
+	case 1:
+		fs, err := os.OpenFile(file, os.O_RDONLY, 0755)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			fs.Close()
+		}()
+		var data []string
+
+		scanner := bufio.NewScanner(fs)
+		for scanner.Scan() {
+			data = append(data, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+
+		return e.esimport(data)
 	}
 
-	log.Printf("Total Hit [%d] Once Receive [%d]\n", hit, len(data))
-
-	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		return err
-	}
-
-	for _, d := range data {
-		fs.WriteString(d + "\n")
-
-	}
 	return nil
 }
 
@@ -76,7 +108,7 @@ func (e *EsInfo) clientInit() (*elastic.Client, error) {
 }
 
 // search 设定检索条件，返回查询的数据,检索的总记录条数
-func (e *EsInfo) search() ([]string, int64, error) {
+func (e *EsInfo) export() ([]string, int64, error) {
 	var result []string
 	searchResult, err := e.client.Search().
 		Index(e.EsIndex).
@@ -99,4 +131,23 @@ func (e *EsInfo) search() ([]string, int64, error) {
 		result = append(result, string(content))
 	}
 	return result, searchResult.Hits.TotalHits, nil
+}
+
+// esimport 加载指定数据到ElasticSearch中
+// data 从文件中加载的数据,必须为json格式
+func (e *EsInfo) esimport(data []string) error {
+	for _, d := range data {
+		_, err := e.client.Index().
+			Index(e.EsIndex).
+			Type(e.EsType).
+			BodyString(d).
+			Refresh("true").
+			Do(e.ctx)
+
+		if err != nil {
+			return errors.New("Insert ElasticSearch Error. " + err.Error())
+		}
+	}
+
+	return nil
 }

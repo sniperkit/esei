@@ -64,7 +64,7 @@ func init() {
 	flag.StringVar(&estype, "type", "", "The type name you want to export/import")
 	flag.BoolVar(&debug, "debug", false, "If true, ESEI will show all ElasticSearch info. Default is false")
 	flag.StringVar(&file, "out", "out.json", "The output file name, default is out.json")
-
+	flag.StringVar(&file, "int", "out.json", "The intput file name, default is out.json")
 	flag.IntVar(&size, "size", 10, "Export/Import the number of records")
 }
 
@@ -113,6 +113,13 @@ func main() {
 		EsType:  estype,
 		EsSize:  size,
 		IsDebug: debug,
+	}
+
+	switch mode {
+	case "exp":
+		ei.Mode = 0
+	case "imp":
+		ei.Mode = 1
 	}
 
 	err = ei.Do(file)
