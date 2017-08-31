@@ -5,7 +5,7 @@ Elasticsearch batch export/import tool
 
 ### Export
 
-*If you have username/password, so you should type these.*
+**If you have username/password, so you should type these.**
 
 ```
 ./esei -esurl=http://[ES domain / ES ip:port] -index=[Index Name] -user=[User Name] -passwd=[Password] -type=[Type Name] 
