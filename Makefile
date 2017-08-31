@@ -7,6 +7,6 @@ run: build
 	./bado
 
 release: *.go es/*.go 
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main._VERSION_=$(shell date +%Y%m%d)" -a
-	docker build -t vikings/bado .
-	docker push vikings/bado
+	GOOS=linux GOARCH=amd64 go build -ldflags "-X main._VERSION_=$(shell date +%Y%m%d)" -a -o esei_linux
+	GOOS=darwin GOARCH=amd64 go build -ldflags "-X main._VERSION_=$(shell date +%Y%m%d)" -a -o esei_darwin
+	GOOS=windows GOARCH=amd64 go build -ldflags "-X main._VERSION_=$(shell date +%Y%m%d)" -a -o esei_windows
