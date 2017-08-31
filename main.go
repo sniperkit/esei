@@ -12,11 +12,13 @@ import (
 
 const (
 	// MODEEMPTY 运行模式不得为空
-	MODEEMPTY = "runtime mode can't be empty"
+	MODEEMPTY = "Runtime mode can't be empty"
+	// MODEERROR 运行模式错误
+	MODEERROR = "Runtime mode error. Valid option are exp/imp"
 	// ESURLEMPTY url不得为空
-	ESURLEMPTY = "esurl can't be empty"
+	ESURLEMPTY = "Esurl can't be empty"
 	// ESIDXEMPTY index不得为空
-	ESIDXEMPTY = "index can't be empty"
+	ESIDXEMPTY = "Index can't be empty"
 )
 
 // mode 指定运行模式
@@ -70,6 +72,11 @@ func isParaValid() error {
 	if mode == "" {
 		return errors.New(MODEEMPTY)
 	}
+
+	if mode != "exp" && mode != "imp" {
+		return errors.New(MODEERROR)
+	}
+
 	if esurl == "" {
 		return errors.New(ESURLEMPTY)
 	}
