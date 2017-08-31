@@ -158,7 +158,7 @@ func (e *EsInfo) esimport(data []string, ticker chan int) error {
 	breakPoint := 0
 	totalLoad := 0
 	tda := data[breakPoint:]
-	for hasRetry < 3 {
+	for hasRetry < 10 {
 
 		if retry {
 			fmt.Printf("ESEI waitting %ds and will try to reimport.", hasRetry*5)
