@@ -161,10 +161,10 @@ func (e *EsInfo) esimport(data []string, ticker chan int) error {
 	for hasRetry < 10 {
 
 		if retry {
-			fmt.Printf("ESEI waitting %ds and will try to reimport.", hasRetry*5)
-			fmt.Printf("ESEI Has Retry [%d] \n", hasRetry)
+			fmt.Printf("ESEI Has Retry [%d]. Will waitting %ds and will try to retry. Currently has load [%d] records. \n", hasRetry, hasRetry*5, totalLoad)
 			time.Sleep(time.Duration(5*hasRetry) * time.Second)
 			tda = tda[breakPoint:]
+
 		}
 
 		retry = false
@@ -180,6 +180,7 @@ func (e *EsInfo) esimport(data []string, ticker chan int) error {
 				retry = true
 				hasRetry++
 				breakPoint = i
+				totalLoad += i
 				break
 			}
 			// 恢复计数器
@@ -188,8 +189,7 @@ func (e *EsInfo) esimport(data []string, ticker chan int) error {
 			select {
 			case _, ok := <-ticker:
 				if ok {
-					totalLoad = totalLoad + i
-					fmt.Printf("ESEI Has Load [%d] Records \n", totalLoad)
+					fmt.Printf("ESEI Has Load [%d] Records \n", totalLoad+i+1)
 				}
 			default:
 
