@@ -39,12 +39,12 @@ func (e *EsInfo) Do(file string) error {
 
 	switch e.Mode {
 	case 0:
-		data, hit, err := e.export()
+		data, err := e.export()
 		if err != nil {
 			return err
 		}
 
-		log.Printf("Total Hit [%d] Once Receive [%d]\n", hit, len(data))
+		log.Printf("Total Hit [%d] \n", len(data))
 
 		fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
 		if err != nil {
@@ -110,7 +110,7 @@ func (e *EsInfo) clientInit() (*elastic.Client, error) {
 }
 
 // search 设定检索条件，返回查询的数据,检索的总记录条数
-func (e *EsInfo) export() ([]string, int64, error) {
+func (e *EsInfo) export() ([]string, error) {
 	var result []string
 	searchResult, err := e.client.Search().
 		Index(e.EsIndex).
@@ -119,7 +119,7 @@ func (e *EsInfo) export() ([]string, int64, error) {
 		Pretty(true).
 		Do(e.ctx)
 	if err != nil {
-		return nil, 0, errors.New("Search ElasticSearch Error. " + err.Error())
+		return nil, errors.New("Search ElasticSearch Error. " + err.Error())
 	}
 
 	for _, hit := range searchResult.Hits.Hits {
@@ -132,7 +132,7 @@ func (e *EsInfo) export() ([]string, int64, error) {
 
 		result = append(result, string(content))
 	}
-	return result, searchResult.Hits.TotalHits, nil
+	return result, nil
 }
 
 // esimport 加载指定数据到ElasticSearch中
