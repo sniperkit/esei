@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -77,6 +78,7 @@ func (e *EsInfo) Do(file string) error {
 		}
 
 		return e.esimport(data)
+
 	}
 
 	return nil
@@ -136,7 +138,8 @@ func (e *EsInfo) export() ([]string, int64, error) {
 // esimport 加载指定数据到ElasticSearch中
 // data 从文件中加载的数据,必须为json格式
 func (e *EsInfo) esimport(data []string) error {
-	for _, d := range data {
+	fmt.Printf("ESEI Will Load [%d] Records \n", len(data))
+	for i, d := range data {
 		_, err := e.client.Index().
 			Index(e.EsIndex).
 			Type(e.EsType).
@@ -147,7 +150,12 @@ func (e *EsInfo) esimport(data []string) error {
 		if err != nil {
 			return errors.New("Insert ElasticSearch Error. " + err.Error())
 		}
+
+		if i > 0 && (i%1000) == 0 {
+			fmt.Printf("ESEI Has Load [%d] Records \n", i)
+		}
 	}
 
+	fmt.Println("ESEI Load Complete!")
 	return nil
 }
