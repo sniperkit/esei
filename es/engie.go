@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	elastic "gopkg.in/olivere/elastic.v5"
 )
@@ -77,7 +78,20 @@ func (e *EsInfo) Do(file string) error {
 			return err
 		}
 
-		return e.esimport(data)
+		ticker := make(chan int, 1)
+		go func() {
+			for {
+				now := time.Now()
+				next := now.Add(time.Second * time.Duration(30))
+				next = time.Date(next.Year(), next.Month(), next.Day(), next.Hour(), next.Minute(), next.Second(), 0, next.Location())
+				ti := time.NewTimer(next.Sub(now))
+				select {
+				case <-ti.C:
+					ticker <- 1
+				}
+			}
+		}()
+		return e.esimport(data, ticker)
 
 	}
 
@@ -137,22 +151,54 @@ func (e *EsInfo) export() ([]string, error) {
 
 // esimport 加载指定数据到ElasticSearch中
 // data 从文件中加载的数据,必须为json格式
-func (e *EsInfo) esimport(data []string) error {
+func (e *EsInfo) esimport(data []string, ticker chan int) error {
 	fmt.Printf("ESEI Will Load [%d] Records \n", len(data))
-	for i, d := range data {
-		_, err := e.client.Index().
-			Index(e.EsIndex).
-			Type(e.EsType).
-			BodyString(d).
-			Refresh("true").
-			Do(e.ctx)
+	retry := false
+	hasRetry := 0
+	breakPoint := 0
+	totalLoad := 0
+	tda := data[breakPoint:]
+	for hasRetry < 3 {
 
-		if err != nil {
-			return errors.New("Insert ElasticSearch Error. " + err.Error())
+		if retry {
+			fmt.Printf("ESEI waitting %ds and will try to reimport.", hasRetry*5)
+			fmt.Printf("ESEI Has Retry [%d] \n", hasRetry)
+			time.Sleep(time.Duration(5*hasRetry) * time.Second)
+			tda = tda[breakPoint:]
 		}
 
-		if i > 0 && (i%1000) == 0 {
-			fmt.Printf("ESEI Has Load [%d] Records \n", i)
+		retry = false
+		for i, d := range tda {
+			_, err := e.client.Index().
+				Index(e.EsIndex).
+				Type(e.EsType).
+				BodyString(d).
+				Do(e.ctx)
+
+			if err != nil {
+				fmt.Println("Insert ElasticSearch Error. " + err.Error())
+				retry = true
+				hasRetry++
+				breakPoint = i
+				break
+			}
+			// 恢复计数器
+			hasRetry = 0
+
+			select {
+			case _, ok := <-ticker:
+				if ok {
+					totalLoad = totalLoad + i
+					fmt.Printf("ESEI Has Load [%d] Records \n", totalLoad)
+				}
+			default:
+
+			}
+
+		}
+
+		if !retry {
+			break
 		}
 	}
 
