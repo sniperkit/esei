@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -20,12 +20,14 @@ type EsInfo struct {
 	EsPass  string
 	EsIndex string
 	EsType  string
+	EsFrom  int
 	EsSize  int
 	IsDebug bool
 	// Mode 运行模式 0 导出/ 1 导入
-	Mode   int
-	client *elastic.Client
-	ctx    context.Context
+	Mode     int
+	client   *elastic.Client
+	ctx      context.Context
+	scrollID string
 }
 
 // Do Elasticsearch入口函数
@@ -40,25 +42,7 @@ func (e *EsInfo) Do(file string) error {
 
 	switch e.Mode {
 	case 0:
-		data, err := e.export()
-		if err != nil {
-			return err
-		}
-
-		log.Printf("Total Hit [%d] \n", len(data))
-
-		fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			fs.Close()
-		}()
-		for _, d := range data {
-			fs.WriteString(d + "\n")
-
-		}
+		err = e.writeFile(file)
 	case 1:
 		fs, err := os.OpenFile(file, os.O_RDONLY, 0755)
 		if err != nil {
@@ -123,31 +107,94 @@ func (e *EsInfo) clientInit() (*elastic.Client, error) {
 	return client, err
 }
 
-// search 设定检索条件，返回查询的数据,检索的总记录条数
+// 保存导出数据到指定文件中
+func (e *EsInfo) writeFile(file string) error {
+	data, err := e.export()
+	if err != nil {
+		return err
+	}
+	log.Printf("Total Hit [%d] \n", len(data))
+
+	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0755)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		fs.Close()
+	}()
+	for _, d := range data {
+		fs.WriteString(d + "\n")
+	}
+
+	return nil
+}
+
 func (e *EsInfo) export() ([]string, error) {
 	var result []string
-	searchResult, err := e.client.Search().
-		Index(e.EsIndex).
-		Query(nil).
-		From(0).Size(e.EsSize).
-		Pretty(true).
-		Do(e.ctx)
-	if err != nil {
-		return nil, errors.New("Search ElasticSearch Error. " + err.Error())
-	}
-
-	for _, hit := range searchResult.Hits.Hits {
-		// var content []byte
-		content, err := json.Marshal(hit.Source)
-		if err != nil {
-			log.Println(err.Error())
+	svc := e.client.Scroll(e.EsIndex).Size(e.EsSize)
+	for {
+		res, err := svc.Do(e.ctx)
+		if err == io.EOF {
 			break
 		}
+		for _, hit := range res.Hits.Hits {
+			content, err := json.Marshal(hit.Source)
+			if err != nil {
+				log.Println(err.Error())
+				break
+			}
+			result = append(result, string(content))
+		}
 
-		result = append(result, string(content))
+		fmt.Printf("ESEI has export [%d] records.\n", len(result))
 	}
+
 	return result, nil
 }
+
+// search 设定检索条件，返回查询的数据,检索的总记录条数.如果存在滚动ID，则一并返回
+// func (e *EsInfo) export() ([]string, string, error) {
+// 	var result []string
+// 	var err error
+// 	var searchResult *elastic.SearchResult
+
+// 	if len(e.scrollID) == 0 {
+// 		searchResult, err = e.client.Scroll(e.EsIndex).
+// 			// Search().
+// 			// Index(e.EsIndex).
+// 			Query(nil).
+// 			// From(e.EsFrom).Size(e.EsSize).
+// 			Size(e.EsSize).
+// 			Pretty(true).
+// 			Do(e.ctx)
+// 		if err != nil {
+// 			return nil, "", errors.New("Search ElasticSearch Error. " + err.Error())
+// 		}
+// 	} else {
+// 		searchResult, err = e.client.Scroll(e.EsIndex).
+// 			Query(nil).
+// 			Pretty(true).
+// 			Do(e.ctx)
+// 		if err != nil {
+// 			return nil, "", errors.New("Search ElasticSearch Error. " + err.Error())
+// 		}
+// 	}
+
+// 	for _, hit := range searchResult.Hits.Hits {
+// 		// var content []byte
+// 		content, err := json.Marshal(hit.Source)
+// 		if err != nil {
+// 			log.Println(err.Error())
+// 			break
+// 		}
+
+// 		result = append(result, string(content))
+// 	}
+
+// 	fmt.Println(searchResult.ScrollId)
+// 	return result, searchResult.ScrollId, nil
+// }
 
 // esimport 加载指定数据到ElasticSearch中
 // data 从文件中加载的数据,必须为json格式

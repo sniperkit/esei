@@ -48,6 +48,9 @@ var file string
 // size 处理条数
 var size int
 
+// from 起始记录数
+var from int
+
 // _VERSION_ ESEI版本号
 var _VERSION_ string
 
@@ -65,7 +68,8 @@ func init() {
 	flag.BoolVar(&debug, "debug", false, "If true, ESEI will show all ElasticSearch info. Default is false")
 	flag.StringVar(&file, "out", "out.json", "The output file name, default is out.json")
 	flag.StringVar(&file, "int", "out.json", "The intput file name, default is out.json")
-	flag.IntVar(&size, "size", 10, "Export/Import the number of records")
+	flag.IntVar(&size, "size", 1000, "The number of exports per time, default is 1000")
+	// flag.IntVar(&from, "from", 0, "Export the start number of records. Default is 0.")
 }
 
 func isParaValid() error {
@@ -112,6 +116,7 @@ func main() {
 		EsIndex: esindex,
 		EsType:  estype,
 		EsSize:  size,
+		EsFrom:  from,
 		IsDebug: debug,
 	}
 
