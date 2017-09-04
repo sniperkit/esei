@@ -132,7 +132,7 @@ func (e *EsInfo) writeFile(file string) error {
 
 func (e *EsInfo) export() ([]string, error) {
 	var result []string
-	svc := e.client.Scroll(e.EsIndex).Size(e.EsSize)
+	svc := e.client.Scroll(e.EsIndex).Type(e.EsType).Size(e.EsSize)
 	for {
 		res, err := svc.Do(e.ctx)
 		if err == io.EOF {
